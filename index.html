@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LU | Bootstrapping Masterclass</title>
+    
+    <!-- Tailwind & Config -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        lu: {
+                            gold: '#B5A26C',
+                            black: '#020617',
+                            charcoal: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800;900&family=JetBrains+Mono:wght@400;700;800&display=swap');
+        
+        :root {
+            --bg-dark: #020617;
+            --panel-bg: rgba(15, 23, 42, 0.6);
+            --border-color: rgba(181, 162, 108, 0.15); /* Gold tinted border */
+            --primary: #B5A26C;     /* LU Gold */
+            --duplicate: #3b82f6;   /* Blue for contrast */
+            --oob: #ef4444;         /* Red */
+            --success: #10b981;     /* Green */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            color: #f8fafc;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(181, 162, 108, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(59, 130, 246, 0.05) 0%, transparent 50%);
+        }
+
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Custom Scrollbar for Terminal */
+        .terminal-scroll::-webkit-scrollbar { width: 4px; }
+        .terminal-scroll::-webkit-scrollbar-track { background: transparent; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 800;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+        
+        .btn-primary { background: var(--primary); color: #020617; box-shadow: 0 4px 15px rgba(181, 162, 108, 0.3); }
+        .btn-primary:hover:not(:disabled) { background: #cbb983; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(181, 162, 108, 0.4); }
+        
+        .btn-fast { background: #3b82f6; color: white; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); }
+        .btn-fast:hover:not(:disabled) { background: #2563eb; transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4); }
+
+        .btn-danger { background: transparent; border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; }
+        .btn-danger:hover:not(:disabled) { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.5); }
+
+        /* SVG Styles */
+        .orb {
+            transition: fill 0.3s, stroke 0.3s;
+        }
+        .orb-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+            font-size: 14px;
+            fill: #ffffff;
+            text-anchor: middle;
+            dominant-baseline: central;
+            pointer-events: none;
+            user-select: none;
+        }
+        .socket {
+            fill: rgba(15, 23, 42, 0.8);
+            stroke: #334155;
+            stroke-width: 2;
+            stroke-dasharray: 4,4;
+        }
+        .connector-path {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 1.5;
+            stroke-dasharray: 4,4;
+        }
+    </style>
+</head>
+<body class="p-6">
+
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-6 px-2 flex-shrink-0">
+        <div>
+            <div class="flex items-center gap-3 mb-1">
+                <span class="bg-lu-gold/20 text-lu-gold text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest border border-lu-gold/30 shadow-[0_0_10px_rgba(181,162,108,0.2)]">DSCI 356000</span>
+                <span class="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Mr. Kalauni</span>
+            </div>
+            <h1 class="text-3xl font-black italic tracking-tight text-white">
+                THE <span class="text-lu-gold">BOOTSTRAP</span> ENGINE
+            </h1>
+        </div>
+        
+        <div class="flex gap-3">
+            <button onclick="resetLab()" id="btn-reset" class="btn btn-danger hidden">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Reset Machine
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex flex-1 gap-6 min-h-0">
+        
+        <!-- Left: Sidebar Controls & Terminal -->
+        <aside class="w-96 flex flex-col gap-6 flex-shrink-0">
+            
+            <!-- Controls -->
+            <div class="glass-panel p-6 border-lu-gold/20">
+                <h2 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                    <i data-lucide="cpu" class="w-4 h-4 text-lu-gold"></i> Sampling Protocol
+                </h2>
+                
+                <div class="flex flex-col gap-3">
+                    <button id="btn-draw-1" onclick="drawSample(1)" class="btn btn-primary">
+                        <i data-lucide="mouse-pointer-click" class="w-4 h-4"></i> Draw 1 Sample
+                    </button>
+                    <button id="btn-draw-all" onclick="drawSample('all')" class="btn btn-fast">
+                        <i data-lucide="fast-forward" class="w-4 h-4"></i> Fast Forward Rest
+                    </button>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-700/50">
+                    <p class="text-[11px] text-slate-400 leading-relaxed font-medium">
+                        <strong class="text-white">With Replacement:</strong> After an item is drawn, it is copied to the sample and the original remains in the pool. It can be drawn again!
+                    </p>
+                </div>
+            </div>
+
+            <!-- Live Analytics -->
+            <div class="glass-panel p-6 flex flex-col border-lu-gold/20">
+                <h2 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                    <i data-lucide="bar-chart-2" class="w-4 h-4 text-lu-gold"></i> Live Metrics
+                </h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">Total Drawn</div>
+                        <div class="text-2xl font-mono font-black text-white"><span id="stat-drawn">0</span><span class="text-sm text-slate-600">/20</span></div>
+                    </div>
+                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">Unique Items</div>
+                        <div class="text-2xl font-mono font-black text-lu-gold" id="stat-unique">0</div>
+                    </div>
+                    <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 col-span-2">
+                        <div class="flex justify-between items-end mb-1">
+                            <div class="text-[10px] text-slate-400 font-bold uppercase">Out-Of-Bag (OOB)</div>
+                            <div class="text-lg font-mono font-black text-red-400" id="stat-oob-pct">0%</div>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                            <div id="oob-bar" class="h-full bg-red-500 transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terminal / Activity Feed -->
+            <div class="glass-panel p-0 flex-1 flex flex-col overflow-hidden border-lu-gold/20">
+                <div class="bg-slate-900/80 px-4 py-3 border-b border-slate-700/50 flex justify-between items-center">
+                    <span class="text-[10px] font-mono font-bold text-slate-400 uppercase">Activity Log</span>
+                    <div class="flex gap-1.5">
+                        <div class="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
+                        <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
+                        <div class="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
+                    </div>
+                </div>
+                <div id="terminal-feed" class="flex-1 p-4 overflow-y-auto terminal-scroll font-mono text-[11px] leading-relaxed space-y-2">
+                    <div class="text-slate-500">> System Initialized. Population size N=20.</div>
+                    <div class="text-slate-500">> Awaiting draw command...</div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Right: The Machine (D3 Canvas) -->
+        <main class="glass-panel border-lu-gold/20 flex-1 relative overflow-hidden flex flex-col">
+            <div class="absolute top-6 left-6 z-10 pointer-events-none">
+                <div class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1">The Generator</div>
+                <div class="flex gap-4 mt-2">
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400"><div class="w-2.5 h-2.5 rounded bg-[#334155]"></div> Unpicked</div>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400"><div class="w-2.5 h-2.5 rounded bg-[var(--primary)]"></div> Picked (1x)</div>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400"><div class="w-2.5 h-2.5 rounded bg-[var(--duplicate)]"></div> Duplicate (2x+)</div>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold text-slate-400"><div class="w-2.5 h-2.5 rounded bg-[var(--oob)]"></div> OOB (Never Picked)</div>
+                </div>
+            </div>
+
+            <div id="d3-container" class="w-full flex-1"></div>
+        </main>
+
+    </div>
+
+    <script>
+        // --- CONFIG & STATE ---
+        const N = 20; // Population Size
+        const COLS = 10; // Grid columns for layout
+        let population = [];
+        let sample = [];
+        let isAnimating = false;
+
+        // Colors
+        const COLOR_UNPICKED = "#334155";
+        const COLOR_PICKED = "var(--primary)";
+        const COLOR_DUPE = "var(--duplicate)";
+        const COLOR_OOB = "var(--oob)";
+
+        // D3 Setup
+        let svg, width, height;
+        let popGroup, sampleGroup, linkGroup, effectsGroup;
+        let popCoords = [], sampleCoords = [];
+
+        function initD3() {
+            const container = document.getElementById('d3-container');
+            width = container.clientWidth;
+            height = container.clientHeight;
+
+            svg = d3.select("#d3-container").append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // SVG Filters for Glow Effects
+            const defs = svg.append("defs");
+            const filter = defs.append("filter").attr("id", "glow").attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
+            filter.append("feGaussianBlur").attr("stdDeviation", "8").attr("result", "blur");
+            const feMerge = filter.append("feMerge");
+            feMerge.append("feMergeNode").attr("in", "blur");
+            feMerge.append("feMergeNode").attr("in", "SourceGraphic");
+
+            linkGroup = svg.append("g").attr("class", "links");
+            popGroup = svg.append("g").attr("class", "population");
+            sampleGroup = svg.append("g").attr("class", "sample");
+            effectsGroup = svg.append("g").attr("class", "effects");
+
+            setupLayout();
+            resetLab();
+        }
+
+        function setupLayout() {
+            // Calculate coordinates for Population (Top) and Sample (Bottom)
+            const nodeRadius = 22;
+            const spacingX = 65;
+            const spacingY = 65;
+            
+            const gridWidth = (COLS - 1) * spacingX;
+            const startX = (width - gridWidth) / 2;
+            
+            const popStartY = height * 0.2;
+            const sampleStartY = height * 0.75;
+
+            popCoords = [];
+            sampleCoords = [];
+
+            for(let i=0; i<N; i++) {
+                const row = Math.floor(i / COLS);
+                const col = i % COLS;
+                const x = startX + col * spacingX;
+                
+                popCoords.push({ x, y: popStartY + row * spacingY });
+                sampleCoords.push({ x, y: sampleStartY + row * spacingY });
+            }
+
+            // Draw Labels
+            svg.append("text")
+                .attr("x", width/2).attr("y", popStartY - 50)
+                .attr("text-anchor", "middle").attr("fill", "#64748b").attr("font-size", "14px").attr("font-weight", "800").attr("letter-spacing", "2px")
+                .text("ORIGINAL POPULATION");
+
+            svg.append("text")
+                .attr("x", width/2).attr("y", sampleStartY - 50)
+                .attr("text-anchor", "middle").attr("fill", "#64748b").attr("font-size", "14px").attr("font-weight", "800").attr("letter-spacing", "2px")
+                .text("BOOTSTRAP SAMPLE");
+        }
+
+        function resetLab() {
+            population = Array.from({length: N}, (_, i) => ({
+                id: i,
+                val: `X${i+1}`, // Identifiers like X1, X2...
+                pickCount: 0
+            }));
+            sample = [];
+            isAnimating = false;
+
+            document.getElementById('btn-draw-1').disabled = false;
+            document.getElementById('btn-draw-all').disabled = false;
+            document.getElementById('btn-reset').classList.add('hidden');
+            
+            document.getElementById('terminal-feed').innerHTML = `
+                <div class="text-slate-500">> System Reset. Population size N=${N}.</div>
+                <div class="text-slate-500">> Awaiting draw command...</div>
+            `;
+            updateStats();
+
+            // Clear visual groups
+            linkGroup.selectAll("*").remove();
+            popGroup.selectAll("*").remove();
+            sampleGroup.selectAll("*").remove();
+            effectsGroup.selectAll("*").remove();
+
+            // Draw Population Nodes
+            const pNodes = popGroup.selectAll(".pop-node").data(population);
+            const pEnter = pNodes.enter().append("g")
+                .attr("class", "pop-node")
+                .attr("id", d => `pop-${d.id}`)
+                .attr("transform", (d, i) => `translate(${popCoords[i].x}, ${popCoords[i].y})`);
+
+            pEnter.append("circle")
+                .attr("class", "orb")
+                .attr("r", 22)
+                .attr("fill", COLOR_UNPICKED)
+                .attr("stroke", "#475569")
+                .attr("stroke-width", 2);
+
+            pEnter.append("text")
+                .attr("class", "orb-text")
+                .text(d => d.val);
+
+            // Draw Empty Sample Sockets
+            const sNodes = sampleGroup.selectAll(".socket-node").data(d3.range(N));
+            sNodes.enter().append("circle")
+                .attr("class", "socket")
+                .attr("cx", d => sampleCoords[d].x)
+                .attr("cy", d => sampleCoords[d].y)
+                .attr("r", 22);
+        }
+
+        // --- ANIMATION LOGIC ---
+
+        async function drawSample(mode) {
+            if(isAnimating || sample.length >= N) return;
+            isAnimating = true;
+
+            document.getElementById('btn-draw-1').disabled = true;
+            document.getElementById('btn-draw-all').disabled = true;
+
+            const isFast = mode === 'all';
+            const drawsToMake = isFast ? (N - sample.length) : 1;
+            const duration = isFast ? 150 : 800; // Speed
+
+            for (let i = 0; i < drawsToMake; i++) {
+                if (sample.length >= N) break;
+                
+                // 1. Pick Random Item
+                const pickId = Math.floor(Math.random() * N);
+                const item = population[pickId];
+                item.pickCount++;
+                const isDupe = item.pickCount > 1;
+                const sampleIndex = sample.length;
+
+                // Update State
+                sample.push({ ...item, sampleId: sampleIndex });
+                
+                // 2. Animate
+                await animateDraw(pickId, sampleIndex, item, isDupe, duration);
+                
+                // 3. Log & Stats
+                logDraw(sampleIndex + 1, item.val, isDupe);
+                updateStats();
+            }
+
+            if (sample.length === N) {
+                finalizeOOB();
+            } else {
+                document.getElementById('btn-draw-1').disabled = false;
+                document.getElementById('btn-draw-all').disabled = false;
+            }
+            
+            isAnimating = false;
+        }
+
+        function animateDraw(popId, sampleIdx, item, isDupe, duration) {
+            return new Promise(resolve => {
+                const startC = popCoords[popId];
+                const endC = sampleCoords[sampleIdx];
+                const color = isDupe ? COLOR_DUPE : COLOR_PICKED;
+
+                // 1. Pulse Population Node
+                const popNode = d3.select(`#pop-${popId} circle`);
+                popNode.transition().duration(duration * 0.3)
+                    .attr("fill", color)
+                    .attr("stroke", "white")
+                    .style("filter", "url(#glow)")
+                    .attr("r", 26)
+                    .transition().duration(duration * 0.3)
+                    .attr("r", 22)
+                    .style("filter", "none")
+                    .attr("stroke", color); // Keep stroke colored
+
+                // 2. Draw connection arc
+                // Calculate control point for a nice bezier curve
+                const midX = (startC.x + endC.x) / 2 + (Math.random() * 100 - 50); // Slight random curve
+                const midY = (startC.y + endC.y) / 2;
+                const pathStr = `M ${startC.x} ${startC.y} Q ${midX} ${midY} ${endC.x} ${endC.y}`;
+                
+                const path = linkGroup.append("path")
+                    .attr("class", "connector-path")
+                    .attr("d", pathStr);
+
+                const totalLength = path.node().getTotalLength();
+                path.attr("stroke-dasharray", `${totalLength} ${totalLength}`)
+                    .attr("stroke-dashoffset", totalLength)
+                    .transition().duration(duration * 0.7).ease(d3.easeQuadInOut)
+                    .attr("stroke-dashoffset", 0)
+                    .on("end", () => {
+                        // Fade out path quickly
+                        path.transition().duration(duration * 0.3).style("opacity", 0).remove();
+                    });
+
+                // 3. Flying Clone
+                const flyerGroup = effectsGroup.append("g")
+                    .attr("transform", `translate(${startC.x}, ${startC.y})`);
+                
+                flyerGroup.append("circle")
+                    .attr("r", 22).attr("fill", color).style("filter", "url(#glow)");
+                flyerGroup.append("text")
+                    .attr("class", "orb-text").text(item.val);
+
+                // Custom tween to follow the bezier curve
+                flyerGroup.transition()
+                    .duration(duration * 0.7)
+                    .ease(d3.easeQuadInOut)
+                    .attrTween("transform", function() {
+                        return function(t) {
+                            const p = path.node().getPointAtLength(t * totalLength);
+                            return `translate(${p.x}, ${p.y})`;
+                        }
+                    })
+                    .on("end", () => {
+                        flyerGroup.remove();
+
+                        // 4. Solidify Sample Node
+                        const sNode = sampleGroup.append("g")
+                            .attr("transform", `translate(${endC.x}, ${endC.y})`);
+                        
+                        sNode.append("circle")
+                            .attr("class", "orb")
+                            .attr("r", 0)
+                            .attr("fill", color)
+                            .attr("stroke", "white")
+                            .attr("stroke-width", 2)
+                            .transition().duration(duration * 0.2).ease(d3.easeBackOut)
+                            .attr("r", 22);
+
+                        sNode.append("text")
+                            .attr("class", "orb-text")
+                            .text(item.val)
+                            .style("opacity", 0)
+                            .transition().duration(duration * 0.2)
+                            .style("opacity", 1);
+
+                        // Dupe Badge in Sample
+                        if (isDupe) {
+                            const badge = sNode.append("g").attr("transform", "translate(12, -18) scale(0)");
+                            badge.append("rect").attr("width", 20).attr("height", 14).attr("rx", 4).attr("fill", "white");
+                            badge.append("text").attr("x", 10).attr("y", 7).attr("fill", COLOR_DUPE).attr("font-size", "10px").attr("font-weight", "900").attr("text-anchor", "middle").attr("dominant-baseline", "central").text(`x${item.pickCount}`);
+                            
+                            badge.transition().delay(duration*0.1).duration(duration*0.3).ease(d3.easeBackOut).attr("transform", "translate(12, -18) scale(1)");
+                        }
+
+                        resolve();
+                    });
+            });
+        }
+
+        function finalizeOOB() {
+            // Identify and highlight unpicked (OOB) items
+            let oobCount = 0;
+            population.forEach((p, i) => {
+                if (p.pickCount === 0) {
+                    oobCount++;
+                    const node = d3.select(`#pop-${p.id} circle`);
+                    node.transition().duration(800)
+                        .attr("fill", COLOR_OOB)
+                        .attr("stroke", "white")
+                        .attr("stroke-width", 3)
+                        .style("filter", "url(#glow)");
+
+                    const group = d3.select(`#pop-${p.id}`);
+                    const badge = group.append("g").attr("transform", "translate(0, -32)").style("opacity", 0);
+                    badge.append("rect").attr("x", -20).attr("width", 40).attr("height", 14).attr("rx", 4).attr("fill", COLOR_OOB);
+                    badge.append("text").attr("x", 0).attr("y", 7).attr("fill", "white").attr("font-size", "9px").attr("font-weight", "900").attr("text-anchor", "middle").attr("dominant-baseline", "central").text("OOB");
+                    
+                    badge.transition().duration(800).style("opacity", 1);
+                } else {
+                    // Dim picked items
+                    d3.select(`#pop-${p.id}`).transition().duration(800).style("opacity", 0.3);
+                }
+            });
+
+            logTerminal(`<span class="text-red-400 font-bold">> SAMPLING COMPLETE. Found ${oobCount} Out-Of-Bag items.</span>`);
+            document.getElementById('btn-reset').classList.remove('hidden');
+        }
+
+        // --- UTILS ---
+
+        function logDraw(drawNum, val, isDupe) {
+            const term = document.getElementById('terminal-feed');
+            let msg = `<span class="text-lu-gold">Draw #${drawNum.toString().padStart(2, '0')}:</span> Picked <span class="text-white font-bold">${val}</span>`;
+            if (isDupe) {
+                msg += ` <span class="text-blue-400 font-bold bg-blue-500/10 px-1 rounded">(Duplicate)</span>`;
+            }
+            term.innerHTML += `<div>${msg}</div>`;
+            term.scrollTop = term.scrollHeight; // Auto scroll
+        }
+
+        function logTerminal(msg) {
+            const term = document.getElementById('terminal-feed');
+            term.innerHTML += `<div class="mt-2 pt-2 border-t border-slate-700/50">${msg}</div>`;
+            term.scrollTop = term.scrollHeight;
+        }
+
+        function updateStats() {
+            const draws = sample.length;
+            const uniqueSet = new Set(sample.map(s => s.id));
+            const unique = uniqueSet.size;
+            
+            document.getElementById('stat-drawn').innerText = draws;
+            document.getElementById('stat-unique').innerText = unique;
+
+            if (draws === N) {
+                const oob = N - unique;
+                const pct = (oob / N * 100).toFixed(0);
+                document.getElementById('stat-oob-pct').innerText = `${pct}% (${oob} items)`;
+                document.getElementById('oob-bar').style.width = `${pct}%`;
+            } else {
+                document.getElementById('stat-oob-pct').innerText = "Calculating...";
+                document.getElementById('oob-bar').style.width = "0%";
+            }
+        }
+
+        // --- START ---
+        window.onload = () => {
+            lucide.createIcons();
+            initD3();
+        };
+
+        window.addEventListener('resize', () => {
+            document.getElementById('d3-container').innerHTML = '';
+            initD3();
+        });
+
+    </script>
+</body>
+</html>
